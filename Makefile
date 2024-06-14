@@ -4,8 +4,10 @@ objloader: parser.tab.c scanner.yy.c
 	gcc -o $@ $^
 
 scanner.yy.c: scanner.l
-	flex -o $@ $^
+	flex -v -o $@ $^
 
 parser.tab.c: parser.y
-	bison -o $@ -vdty $^
+	bison -o $@ $^ -d 
 
+run:
+	cat ./samples/ilegal_input_2.c | ./objloader
