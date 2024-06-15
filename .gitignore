@@ -3,3 +3,4 @@ parser.output
 parser.tab*
 scanner.yy.c
 .vscode/
+build

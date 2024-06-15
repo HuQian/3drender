@@ -4,19 +4,21 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include "ast.hpp"
 }
 
 %{
 #include <iostream>
 #include <memory>
 #include <string>
+#include "ast.hpp"
 
 // implement by flex generated code, called by bison generated code
 extern int yylex(void); 
 
 static void
-yyerror(std::unique_ptr<std::string> &ast, const char *msg) {
-    std::cout << *ast << std::endl;
+yyerror(std::unique_ptr<BaseAST> &global_ast, const char *msg) {
+    global_ast->dump();
     std::cout << "Error: " << msg << std::endl;
     exit(1);
 }
@@ -34,12 +36,14 @@ static int f_index_type_is_ok (int type) {
 %}
 
 %define parse.error verbose
-%parse-param { std::unique_ptr<std::string> &ast }
+%parse-param { std::unique_ptr<BaseAST> &global_ast }
 
 %union {
     int num_i;
     double num_float;
     double num_float_e;
+
+    BaseAST *ast_val;
 }
 
 %token T_D
@@ -56,6 +60,8 @@ static int f_index_type_is_ok (int type) {
 %token <num_float>      T_NUM_FLOAT
 %token <num_float_e>    T_NUM_FLOAT_E
 
+%type <num_float> line_v_vertex
+%type <ast_val> line_v
 
 %%
 
@@ -66,7 +72,14 @@ file :
 line :
     line_comment
     |
-    line_v
+    line_v {
+        CompUnitAST* ptr = dynamic_cast<CompUnitAST*>(global_ast.get());
+        if (ptr) {
+            ptr->line_list.push_back(std::unique_ptr<BaseAST>($1));
+        } else {
+            std::cout << "Error: invalid ptr\n";
+        }
+    }
     |
     line_vt
     |
@@ -78,7 +91,15 @@ line_comment :
     ;
 
 line_v :
-    T_ELE_V SS line_v_vertex SS line_v_vertex SS line_v_vertex line_end
+    T_ELE_V SS line_v_vertex SS line_v_vertex SS line_v_vertex line_end {
+        auto ast = new LineVAST();
+        ast->type = "v";
+        ast->v0 = $3;
+        ast->v1 = $5;
+        ast->v2 = $7;
+
+        $$ = ast;
+    }
     ;
 
 line_vt :
@@ -86,7 +107,7 @@ line_vt :
     ;
 
 line_v_vertex :
-    T_NUM_INT {printf("T_NUM_INT: %ld\n", $1);}
+    T_NUM_INT {printf("T_NUM_INT: %d\n", $1);}
     |
     T_NUM_FLOAT {printf("T_NUM_FLOAT: %.14lf\n", $1);}
     |
