@@ -1,12 +1,29 @@
-%{
+/* following code will put in hpp */
+%code requires {
 #include <stdio.h>
-extern void yyerror(const char* msg); // implement in .l, called by bison generated code
-extern int yylex(void); // implement by flex generated code, called by bison generated code
+#include <iostream>
+#include <memory>
+#include <string>
+}
+
+%{
+#include <iostream>
+#include <memory>
+#include <string>
+
+// implement by flex generated code, called by bison generated code
+extern int yylex(void); 
+
+static void
+yyerror(std::unique_ptr<std::string> &ast, const char *msg) {
+    std::cout << *ast << std::endl;
+    std::cout << "Error: " << msg << std::endl;
+    exit(1);
+}
 
 static int f_index_type = -1;
 static int f_index_type_is_ok (int type) {
     if (f_index_type != -1 && f_index_type != type) {
-        yyerror("un consistency index type\n");
         return -1;
     } else {
         f_index_type = type;
@@ -17,6 +34,7 @@ static int f_index_type_is_ok (int type) {
 %}
 
 %define parse.error verbose
+%parse-param { std::unique_ptr<std::string> &ast }
 
 %union {
     int num_i;
@@ -64,7 +82,7 @@ line_v :
     ;
 
 line_vt :
-    T_ELE_V SS line_v_vertex SS line_v_vertex SS line_v_vertex line_end
+    T_ELE_VT SS line_v_vertex SS line_v_vertex SS line_v_vertex line_end
     ;
 
 line_v_vertex :
@@ -100,7 +118,3 @@ line_end :
     ;
 %%
 
-int main() {
-
-    return yyparse();
-}

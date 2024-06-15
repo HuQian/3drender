@@ -1,13 +1,19 @@
 out: objloader
 
-objloader: parser.tab.c scanner.yy.c
-	gcc -o $@ $^
+objloader: main.cpp parser.tab.cpp scanner.yy.cpp
+	g++ -o $@ $^
 
-scanner.yy.c: scanner.l
+scanner.yy.cpp: scanner.l
 	flex -v -o $@ $^
 
-parser.tab.c: parser.y
+parser.tab.cpp: parser.y
 	bison -o $@ $^ -d 
 
 run:
-	cat ./samples/ilegal_input_2.c | ./objloader
+	./objloader samples/ilegal_input_2.c
+
+clean:
+	-rm parser.tab*
+	-rm parser.output
+	-rm scanner.yy*
+	-rm objloader

@@ -1,13 +1,20 @@
+%option noyywrap
+%option nounput
+%option noinput
+%option debug
+%option yylineno
+
 %{
-#include "parser.tab.h"
+#include <string>
+#include <iostream>
+
+#include "parser.tab.hpp"
 
 double get_float ();
 double get_float_e ();
 
 %}
 
-%option debug
-%option yylineno
 
 %%
 
@@ -62,9 +69,6 @@ double get_float_e ();
 
 %%
 
-int yywrap(void) { 
-    return 1;
-}
 
 double get_float() {
     double value = 0;
@@ -143,7 +147,3 @@ double get_float_e() {
     return value;
 }
 
-void yyerror(const char *msg) {
-    printf("Error: at line: %d\n\t%s\n", yylineno, msg);
-    exit(1);
-}
