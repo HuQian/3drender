@@ -27,6 +27,10 @@ double get_float_e ();
     return T_Type_VN;
 }
 
+^vt {
+    return T_Type_VT;
+}
+
 ^p {
     return T_Type_P;
 }
