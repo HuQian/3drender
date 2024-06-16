@@ -21,17 +21,99 @@ int main(int argc, const char *argv[]) {
   yyin = fopen(input, "r");
   assert(yyin);
 
-  unique_ptr<BaseAST> real_ast = unique_ptr<BaseAST>(new CompUnitAST());
+  ModelData* model_data = new ModelData();
 
-  auto ret = yyparse(real_ast);
+  auto ret = yyparse(model_data);
+  printf ("[%d]\n", ret);
   assert(!ret);
 
-  std::cout << "AST: " << std::endl;
-  if (real_ast) {
-    cout << real_ast->dump() << endl;
-  } else {
-    cout << "[empty]" << endl;
+  for (auto& point : model_data->point_list) {
+    ssize_t i = point.index-1;
+
+    if (!model_data->v_list.empty()) {
+      if ((i < 0) || (i >= model_data->v_list.size()))
+        goto out;
+
+      auto& vertex = model_data->v_list[i];
+
+      point.vertex.v0 = vertex.x;
+      point.vertex.v1 = vertex.y;
+      point.vertex.v2 = vertex.z;
+    }
   }
+
+  for (auto& line : model_data->line_list) {
+    for (auto index : line.index_list) {
+      ssize_t i = index-1;
+
+      if (!model_data->v_list.empty()) {
+        if ((i < 0) || (i >= model_data->v_list.size()))
+          goto out;
+
+        auto& vertex = model_data->v_list[i];
+
+        ObjVec3 tmp;
+        tmp.v0 = vertex.x;
+        tmp.v1 = vertex.y;
+        tmp.v2 = vertex.z;
+
+        line.vertex_list.push_back(tmp);
+      }
+    }
+  }
+
+  for (auto& face : model_data->face_list) {
+    for (auto index : face.index_list) {
+      ssize_t i = index-1;
+
+      if (!model_data->v_list.empty()) {
+        if ((i < 0) || (i >= model_data->v_list.size()))
+          goto out;
+
+        auto& vertex = model_data->v_list[i];
+
+        ObjVec3 tmp;
+        tmp.v0 = vertex.x;
+        tmp.v1 = vertex.y;
+        tmp.v2 = vertex.z;
+
+        face.vertex_list.push_back(tmp);
+      }
+
+      if (!model_data->vt_list.empty()) {
+        if ((i < 0) || (i >= model_data->vt_list.size()))
+          goto out;
+
+        auto& texture = model_data->vt_list[i];
+
+        ObjVec2 tmp;
+        tmp.v0 = texture.u;
+        tmp.v1 = texture.v;
+
+        face.vertex_texture_list.push_back(tmp);
+      }
+
+      if (!model_data->vn_list.empty()) {
+        if ((i < 0) || (i >= model_data->vn_list.size()))
+          goto out;
+
+        auto& normal = model_data->vn_list[i];
+
+        ObjVec3 tmp;
+        tmp.v0 = normal.dx;
+        tmp.v1 = normal.dy;
+        tmp.v2 = normal.dz;
+
+        face.vertex_normal_list.push_back(tmp);
+      }
+    }
+  }
+
+  model_data->dump();
+
+out:
+
+  delete model_data;
 
   return 0;
 }

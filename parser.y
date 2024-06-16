@@ -17,8 +17,8 @@
 extern int yylex(void); 
 
 static void
-yyerror(std::unique_ptr<BaseAST> &global_ast, const char *msg) {
-    global_ast->dump();
+yyerror(ModelData* model_data, const char *msg) {
+    (void) model_data;
     std::cout << "Error: " << msg << std::endl;
     exit(1);
 }
@@ -36,106 +36,179 @@ static int f_index_type_is_ok (int type) {
 %}
 
 %define parse.error verbose
-%parse-param { std::unique_ptr<BaseAST> &global_ast }
+%parse-param { ModelData* model_data }
 
 %union {
     int num_i;
     double num_float;
     double num_float_e;
-
-    BaseAST *ast_val;
 }
 
-%token T_D
-%token T_COMMENT
 %token T_NEWLINE
-%token SS
+%token T_S
+%token T_D
 
-%token T_ELE_V
-%token T_ELE_VT
-%token T_ELE_VN
-%token T_ELE_F
+%token T_Type_V
+%token T_Type_VT
+%token T_Type_VN
+
+%token T_Type_P
+%token T_Type_L
+%token T_Type_F
 
 %token <num_i>          T_NUM_INT
 %token <num_float>      T_NUM_FLOAT
 %token <num_float_e>    T_NUM_FLOAT_E
 
-%type <num_float> line_v_vertex
-%type <ast_val> line_v
+%token T_COMMENT
+
+%type <num_float> T_Type_Number
+
 
 %%
 
-file :
-    | file line
+T_File :
+    | T_File T_Line
     ;
 
-line :
-    line_comment
-    |
-    line_v {
-        CompUnitAST* ptr = dynamic_cast<CompUnitAST*>(global_ast.get());
-        if (ptr) {
-            ptr->line_list.push_back(std::unique_ptr<BaseAST>($1));
-        } else {
-            std::cout << "Error: invalid ptr\n";
-        }
-    }
-    |
-    line_vt
-    |
-    line_f
-    ;
-
-line_comment :
+T_Line :
     T_COMMENT
+    |
+    T_VertexDataV
+    |
+    T_VertexDataVT
+    |
+    T_VertexDataVN
+    |
+    T_ElementPoint
+    |
+    T_ElementLine
+    |
+    T_ElementFace
     ;
 
-line_v :
-    T_ELE_V SS line_v_vertex SS line_v_vertex SS line_v_vertex line_end {
-        auto ast = new LineVAST();
-        ast->type = "v";
-        ast->v0 = $3;
-        ast->v1 = $5;
-        ast->v2 = $7;
-
-        $$ = ast;
+T_VertexDataV :
+    T_Type_V T_S T_Type_Number T_S T_Type_Number T_S T_Type_Number T_LineEnd {
+        model_data->v_list.push_back(VertexDataV {$3, $5, $7});
     }
     ;
 
-line_vt :
-    T_ELE_VT SS line_v_vertex SS line_v_vertex SS line_v_vertex line_end
+T_VertexDataVT :
+    T_Type_VT T_S T_Type_Number T_S T_Type_Number T_LineEnd {
+        model_data->vt_list.push_back(VertexDataVT {$3, $5});
+    }
     ;
 
-line_v_vertex :
-    T_NUM_INT {printf("T_NUM_INT: %d\n", $1);}
+T_VertexDataVN :
+    T_Type_VN T_S T_Type_Number T_S T_Type_Number T_S T_Type_Number T_LineEnd {
+        model_data->vn_list.push_back(VertexDataVN {$3, $5, $7});
+    }
+    ;
+
+T_Type_Number :
+    T_NUM_INT {
+        printf("T_NUM_INT: %d\n", $1);
+        $$ = $1;
+    }
     |
-    T_NUM_FLOAT {printf("T_NUM_FLOAT: %.14lf\n", $1);}
+    T_NUM_FLOAT {
+        printf("T_NUM_FLOAT: %.14lf\n", $1);
+        $$ = $1;
+    }
     |
-    T_NUM_FLOAT_E {printf("T_NUM_FLOAT_E: %.14lf\n", $1);}
+    T_NUM_FLOAT_E {
+        printf("T_NUM_FLOAT_E: %.14lf\n", $1);
+        $$ = $1;
+    }
+    ;
+
+/*
+  p v
+*/
+T_ElementPoint :
+    T_Type_P T_S T_NUM_INT T_LineEnd {
+        ElementPoint tmp;
+        tmp.index = $3;
+
+        model_data->point_list.push_back(tmp);
+    }
+    ;
+
+/*
+  l v0...vn
+*/
+T_ElementLine :
+    T_Type_L T_LineVertexIndexList T_LineEnd
+    ;
+
+T_LineVertexIndexList :
+    {
+        model_data->line_list.push_back(ElementLine());
+    }
+    |
+    T_LineVertexIndexList T_S T_NUM_INT {
+        auto& line = model_data->line_list.back();
+
+        line.index_list.push_back($3);
+    }
     ;
 
 /*
    f v
+   f v/vt
    f v//vn
-   f v/vt/vn 
+   f v/vt/vn
 */
-line_f :
-    T_ELE_F f_index_list line_end
+T_ElementFace :
+    T_Type_F T_FaceVertexIndexList T_LineEnd
     ;
 
-f_index_list:
+T_FaceVertexIndexList :
+    {
+        model_data->face_list.push_back(ElementFace());
+    }
     |
-    f_index_list SS T_NUM_INT { if (-1 == f_index_type_is_ok(1)) YYERROR; printf ("-%d-", $3); }
+    T_FaceVertexIndexList T_S T_NUM_INT {
+        printf ("f type 1\n");
+        if (-1 == f_index_type_is_ok(1))
+            YYERROR;
+        auto& face = model_data->face_list.back();
+        face.index_list.push_back($3);
+    }
     |
-    f_index_list SS T_NUM_INT T_D T_D T_NUM_INT { if (-1 == f_index_type_is_ok(2)) YYERROR; }
+    T_FaceVertexIndexList T_S T_NUM_INT T_D T_NUM_INT {
+        printf ("f type 2\n");
+        if (-1 == f_index_type_is_ok(2))
+            YYERROR;
+
+        auto& face = model_data->face_list.back();
+        face.index_list.push_back($3);
+        face.index_texture_list.push_back($5);
+    }
     |
-    f_index_list SS T_NUM_INT T_D T_NUM_INT T_D T_NUM_INT { if (-1 == f_index_type_is_ok(3)) YYERROR; }
+    T_FaceVertexIndexList T_S T_NUM_INT T_D T_D T_NUM_INT {
+        printf ("f type 3\n");
+        if (-1 == f_index_type_is_ok(3))
+            YYERROR;
+        auto& face = model_data->face_list.back();
+        face.index_list.push_back($3);
+        face.index_normal_list.push_back($6);
+    }
+    |
+    T_FaceVertexIndexList T_S T_NUM_INT T_D T_NUM_INT T_D T_NUM_INT {
+        printf ("f type 4\n");
+        if (-1 == f_index_type_is_ok(4))
+            YYERROR;
+        auto& face = model_data->face_list.back();
+        face.index_list.push_back($3);
+        face.index_texture_list.push_back($5);
+        face.index_normal_list.push_back($7);
+    }
     ;
 
-
-line_end :
+T_LineEnd :
     |
-    SS
+    T_S
     ;
 %%
 

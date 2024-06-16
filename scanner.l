@@ -20,17 +20,24 @@ double get_float_e ();
 
 
 ^v {
-    return T_ELE_V;
+    return T_Type_V;
 }
 
 ^vn {
-    return T_ELE_VN;
+    return T_Type_VN;
+}
+
+^p {
+    return T_Type_P;
+}
+
+^l {
+    return T_Type_L;
 }
 
 ^f {
-    return T_ELE_F;
+    return T_Type_F;
 }
-
 
 [0-9]+ {
     yylval.num_i = atoi(yytext); /* we save value in yylval when flex, and get it by bison */
@@ -50,7 +57,7 @@ double get_float_e ();
 }
 
 [ \t]+ {
-    return SS;
+    return T_S;
 }
 
 \/ {
