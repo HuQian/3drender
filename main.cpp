@@ -35,13 +35,9 @@ draw_png() {
     libattopng_destroy(png);
 }
 
-int main(int argc, const char *argv[]) {
-  draw_png();
-
-  assert(argc == 2);
-  auto input = argv[1];
-
-  yyin = fopen(input, "r");
+ModelData*
+loadModel(const char* mode_file) {
+  yyin = fopen(mode_file, "r");
   assert(yyin);
 
   ModelData* model_data = new ModelData();
@@ -59,9 +55,9 @@ int main(int argc, const char *argv[]) {
 
       auto& vertex = model_data->v_list[i];
 
-      point.vertex.v0 = vertex.x;
-      point.vertex.v1 = vertex.y;
-      point.vertex.v2 = vertex.z;
+      point.vertex[0] = vertex.x;
+      point.vertex[1] = vertex.y;
+      point.vertex[2] = vertex.z;
     }
   }
 
@@ -75,12 +71,7 @@ int main(int argc, const char *argv[]) {
 
         auto& vertex = model_data->v_list[i];
 
-        ObjVec3 tmp;
-        tmp.v0 = vertex.x;
-        tmp.v1 = vertex.y;
-        tmp.v2 = vertex.z;
-
-        line.vertex_list.push_back(tmp);
+        line.vertex_list.push_back(Eigen::Vector3d(vertex.x, vertex.y, vertex.z));
       }
     }
   }
@@ -95,12 +86,7 @@ int main(int argc, const char *argv[]) {
 
         auto& vertex = model_data->v_list[i];
 
-        ObjVec3 tmp;
-        tmp.v0 = vertex.x;
-        tmp.v1 = vertex.y;
-        tmp.v2 = vertex.z;
-
-        face.vertex_list.push_back(tmp);
+        face.vertex_list.push_back(Eigen::Vector3d(vertex.x, vertex.y, vertex.z));
       }
 
       if (!model_data->vt_list.empty()) {
@@ -109,11 +95,7 @@ int main(int argc, const char *argv[]) {
 
         auto& texture = model_data->vt_list[i];
 
-        ObjVec2 tmp;
-        tmp.v0 = texture.u;
-        tmp.v1 = texture.v;
-
-        face.vertex_texture_list.push_back(tmp);
+        face.vertex_texture_list.push_back(Eigen::Vector2d(texture.u, texture.v));
       }
 
       if (!model_data->vn_list.empty()) {
@@ -122,17 +104,24 @@ int main(int argc, const char *argv[]) {
 
         auto& normal = model_data->vn_list[i];
 
-        ObjVec3 tmp;
-        tmp.v0 = normal.dx;
-        tmp.v1 = normal.dy;
-        tmp.v2 = normal.dz;
-
-        face.vertex_normal_list.push_back(tmp);
+        face.vertex_normal_list.push_back(Eigen::Vector3d(normal.dx, normal.dy, normal.dz));
       }
     }
   }
 
   model_data->dump();
+
+out:
+  return model_data;
+}
+
+int main(int argc, const char *argv[]) {
+  draw_png();
+
+  assert(argc == 2);
+  auto input = argv[1];
+
+  ModelData* model_data = loadModel(input);
 
 out:
 

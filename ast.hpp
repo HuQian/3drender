@@ -3,6 +3,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <iostream>
+
+#include <Eigen/Dense>
 
 
 struct VertexDataV {
@@ -45,13 +48,14 @@ struct ObjVec2 {
 struct ElementPoint {
     int index;
 
-    ObjVec3 vertex;
+    //ObjVec3 vertex;
+    Eigen::Vector3d vertex;
 };
 
 struct ElementLine {
     std::vector<int> index_list;
 
-    std::vector<ObjVec3> vertex_list;
+    std::vector<Eigen::Vector3d> vertex_list;
 };
 
 struct ElementFace {
@@ -59,9 +63,9 @@ struct ElementFace {
     std::vector<int> index_texture_list;
     std::vector<int> index_normal_list;
 
-    std::vector<ObjVec3> vertex_list;
-    std::vector<ObjVec2> vertex_texture_list;
-    std::vector<ObjVec3> vertex_normal_list;
+    std::vector<Eigen::Vector3d> vertex_list;
+    std::vector<Eigen::Vector2d> vertex_texture_list;
+    std::vector<Eigen::Vector3d> vertex_normal_list;
 };
 
 
@@ -75,18 +79,18 @@ struct ModelData {
     std::vector<ElementFace> face_list;
 
     void dump() {
+        Eigen::IOFormat CommaInitFmt(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ", ";");
+
         std::cout << "-----Point :-----" << std::endl;
         for (auto& point : this->point_list) {
-            auto& vec3 = point.vertex;
-
-            printf ("%lf %lf %lf\n", vec3.v0, vec3.v1, vec3.v2);
+            std::cout << point.vertex.transpose().format(CommaInitFmt) << std::endl;
         }
 
         std::cout << "-----Line :-----" << std::endl;
         for (auto& line : this->line_list) {
             printf ("line=>\n");
             for (auto& vec3 : line.vertex_list) {
-                printf ("%lf %lf %lf\n", vec3.v0, vec3.v1, vec3.v2);
+                std::cout << vec3.transpose().format(CommaInitFmt) << std::endl;
             }
         }
 
@@ -94,7 +98,7 @@ struct ModelData {
         for (auto& face : this->face_list) {
             printf ("face=>\n");
             for (auto& vec3 : face.vertex_list) {
-                printf ("%lf %lf %lf\n", vec3.v0, vec3.v1, vec3.v2);
+                std::cout << vec3.transpose().format(CommaInitFmt) << std::endl;
             }
         }
     }
