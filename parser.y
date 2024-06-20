@@ -128,7 +128,7 @@ T_Type_Number :
 T_ElementPoint :
     T_Type_P T_S T_NUM_INT T_LineEnd {
         ElementPoint tmp;
-        tmp.index = $3;
+        tmp.index_pos = $3;
 
         model_data->point_list.push_back(tmp);
     }
@@ -149,7 +149,7 @@ T_LineVertexIndexList :
     T_LineVertexIndexList T_S T_NUM_INT {
         auto& line = model_data->line_list.back();
 
-        line.index_list.push_back($3);
+        line.index_pos_list.push_back($3);
     }
     ;
 
@@ -173,7 +173,7 @@ T_FaceVertexIndexList :
         if (-1 == f_index_type_is_ok(1))
             YYERROR;
         auto& face = model_data->face_list.back();
-        face.index_list.push_back($3);
+        face.index_pos_list.push_back($3);
     }
     |
     T_FaceVertexIndexList T_S T_NUM_INT T_D T_NUM_INT {
@@ -182,7 +182,7 @@ T_FaceVertexIndexList :
             YYERROR;
 
         auto& face = model_data->face_list.back();
-        face.index_list.push_back($3);
+        face.index_pos_list.push_back($3);
         face.index_texture_list.push_back($5);
     }
     |
@@ -191,7 +191,7 @@ T_FaceVertexIndexList :
         if (-1 == f_index_type_is_ok(3))
             YYERROR;
         auto& face = model_data->face_list.back();
-        face.index_list.push_back($3);
+        face.index_pos_list.push_back($3);
         face.index_normal_list.push_back($6);
     }
     |
@@ -200,7 +200,7 @@ T_FaceVertexIndexList :
         if (-1 == f_index_type_is_ok(4))
             YYERROR;
         auto& face = model_data->face_list.back();
-        face.index_list.push_back($3);
+        face.index_pos_list.push_back($3);
         face.index_texture_list.push_back($5);
         face.index_normal_list.push_back($7);
     }

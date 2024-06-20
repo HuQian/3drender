@@ -43,7 +43,7 @@ double get_float_e ();
     return T_Type_F;
 }
 
-[0-9]+ {
+[+-]*[0-9]+ {
     yylval.num_i = atoi(yytext); /* we save value in yylval when flex, and get it by bison */
     return T_NUM_INT;
 }
