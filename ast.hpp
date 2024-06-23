@@ -56,6 +56,68 @@ struct ElementFace {
     std::vector<Eigen::Vector4d> vertex_normal_list;
 };
 
+class PixelMap {
+#define RGBA(r, g, b, a) ((r) | ((g) << 8) | ((b) << 16) | ((a) << 24))
+#define RGB(r, g, b) RGBA(r, g, b, 0xff)
+    struct Pixel {
+        bool occupied;
+        double depth;
+        uint32_t color;
+    };
+
+    int w;
+    int h;
+    Pixel* pixels;
+    int pixelCount;
+
+    double depthMin;
+    double depthMax;
+public:
+    PixelMap(int width, int height, double depth_min, double depth_max) {
+        this->w = width;
+        this->h = height;
+        this->depthMax = depth_max;
+        this->depthMin = depth_min;
+        this->pixelCount = this->w * this->h;
+        this->pixels = new Pixel[this->pixelCount];
+        for (int i = 0; i < this->pixelCount; i++) {
+            this->pixels[i].occupied = false;
+        }
+    }
+
+    void setPixel(int i, int j, uint32_t color, double depth) {
+        Pixel* p = &(this->pixels[i + j * this->w]);
+        if (p->occupied) {
+            if (depth < p->depth) {
+                p->depth = depth;
+                p->color = color;
+            }
+        } else {
+            p->depth = depth;
+            p->color = color;
+            p->occupied = true;
+        }
+    }
+
+    void drawDepthPicture() {
+        libattopng_t *png = libattopng_new(this->w, this->h, PNG_RGBA);
+        for (int i = 0; i < this->w; i++) {
+            for (int j = 0; j < this->h; j++) {
+                Pixel* p = &(this->pixels[i + j * this->w]);
+                if (p->occupied) {
+                    int depth_color = (p->depth - this->depthMin) / (this->depthMax - this->depthMin) * 255;
+                    libattopng_set_pixel(png, i, j, RGBA(depth_color, depth_color, depth_color, 255));
+                }
+            }
+        }
+        libattopng_save(png, "test_rgba.png");
+        libattopng_destroy(png);
+    }
+
+    ~PixelMap() {
+        delete[] this->pixels;
+    }
+};
 
 struct ModelData {
     std::vector<VertexDataV> v_list;
@@ -139,10 +201,7 @@ struct ModelData {
     }
 
     void doRaster(int w, int h) {
-        #define RGBA(r, g, b, a) ((r) | ((g) << 8) | ((b) << 16) | ((a) << 24))
-        #define RGB(r, g, b) RGBA(r, g, b, 0xff)
-
-        libattopng_t *png = libattopng_new(w+1, h+1, PNG_RGBA);
+        PixelMap pmap(w, h, -5, -10);
 
         double dx = 2.0 / w;
         double dy = 2.0 / h;
@@ -151,7 +210,7 @@ struct ModelData {
             int i = point.vertex[0] / dx + w / 2;
             int j = -point.vertex[1] / dy + h / 2;
 
-            libattopng_set_pixel(png, i, j, RGBA(255, 0, 255, 255));
+            //libattopng_set_pixel(png, i, j, RGBA(255, 0, 255, 255));
             printf ("i : %d j : %d\n", i, j);
         }
 
@@ -159,16 +218,17 @@ struct ModelData {
             for (int i = 0; i < w; i++) {
                 for (int j = 0; j < h; j++) {
                     if (inFace(i * dx - 1, (h-j) * dy -1, face)) {
-                        libattopng_set_pixel(png, i, j, RGBA(0, 0, 255, 255));
-
+                        //libattopng_set_pixel(png, i, j, RGBA(0, 0, 255, 255));
+                        pmap.setPixel(i, j, 0, -9);
                     }
 
                 }
             }
         }
+        pmap.drawDepthPicture();
 
-        libattopng_save(png, "test_rgba.png");
-        libattopng_destroy(png);
+        //libattopng_save(png, "test_rgba.png");
+        //libattopng_destroy(png);
 #if 0
         for (int i = 0; i < w; i++) {
             double x0 = dx * i;
