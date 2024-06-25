@@ -50,7 +50,10 @@ trans_obj_index_to_arr(int idx, size_t* i, int v_list_size) {
 struct ElementPoint {
     int index_pos;
 
+private:
     Eigen::Vector4d vertex;
+    Eigen::Vector4d vertex_mv;
+    Eigen::Vector4d vertex_mvp;
 
 public:
     void loadV(std::vector<VertexDataV>& v_list) {
@@ -67,12 +70,27 @@ public:
         this->vertex[2] = v.z;
         this->vertex[3] = 1;
     }
+
+    void doTrans(Eigen::Matrix4d mv, Eigen::Matrix4d mvp) {
+        this->vertex_mv = mv * this->vertex;
+        this->vertex_mvp = mvp * this->vertex;
+        this->vertex_mvp /= this->vertex_mvp[3];
+    }
+
+    void dump(int type) {
+        Eigen::IOFormat CommaInitFmt(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ", ";");
+
+        std::cout << "<P>" << vertex.transpose().format(CommaInitFmt) << std::endl;
+    }
 };
 
 struct ElementLine {
     std::vector<int> index_pos_list;
 
+private:
     std::vector<Eigen::Vector4d> vertex_pos_list;
+    std::vector<Eigen::Vector4d> vertex_pos_list_mv;
+    std::vector<Eigen::Vector4d> vertex_pos_list_mvp;
 
 public:
     void loadV(std::vector<VertexDataV>& v_list) {
@@ -89,6 +107,26 @@ public:
             this->vertex_pos_list.push_back(Eigen::Vector4d(v.x, v.y, v.z, 1));
         }
     }
+
+    void doTrans(Eigen::Matrix4d mv_matrix, Eigen::Matrix4d mvp_matrix) {
+        for (auto& v : this->vertex_pos_list) {
+            this->vertex_pos_list_mv.push_back(mv_matrix * v);
+
+            Eigen::Vector4d t;
+            t = mvp_matrix * v;
+            t /= t[3];
+
+            this->vertex_pos_list_mvp.push_back(t);
+        }
+    }
+
+    void dump(int type) {
+        Eigen::IOFormat CommaInitFmt(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ", ";");
+
+        for (auto& v : this->vertex_pos_list) {
+            std::cout << "<L>" << v.transpose().format(CommaInitFmt) << std::endl;
+        }
+    }
 };
 
 struct ElementFace {
@@ -96,7 +134,11 @@ struct ElementFace {
     std::vector<int> index_texture_list;
     std::vector<int> index_normal_list;
 
+private:
     std::vector<Eigen::Vector4d> vertex_pos_list;
+    std::vector<Eigen::Vector4d> vertex_pos_list_mv;
+    std::vector<Eigen::Vector4d> vertex_pos_list_mvp;
+
     std::vector<Eigen::Vector3d> vertex_texture_list;
     std::vector<Eigen::Vector4d> vertex_normal_list;
 
@@ -141,6 +183,62 @@ public:
             auto& normal = vn_list[i];
             this->vertex_normal_list.push_back(Eigen::Vector4d(normal.dx, normal.dy, normal.dz, 0));
         }
+    }
+
+    void doTrans(Eigen::Matrix4d mv_matrix, Eigen::Matrix4d mvp_matrix) {
+        for (auto& v : this->vertex_pos_list) {
+            this->vertex_pos_list_mv.push_back(mv_matrix * v);
+
+            Eigen::Vector4d t;
+            t = mvp_matrix * v;
+            t /= t[3];
+            this->vertex_pos_list_mvp.push_back(t);
+        }
+    }
+
+    void dump(int type) {
+        Eigen::IOFormat CommaInitFmt(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ", ";");
+
+        for (auto& v : this->vertex_pos_list) {
+            std::cout << "<F>" << v.transpose().format(CommaInitFmt) << std::endl;
+        }
+    }
+
+    bool inFace(double x, double y) {
+        if (this->vertex_pos_list.size() != 3) {
+            std::cout << "Fail to judge inface\n";
+            return false;
+        }
+
+        auto& v0 = this->vertex_pos_list_mvp[0];
+        auto& v1 = this->vertex_pos_list_mvp[1];
+        auto& v2 = this->vertex_pos_list_mvp[2];
+
+        Eigen::Vector2d a(v0[0], v0[1]);
+        Eigen::Vector2d b(v1[0], v1[1]);
+        Eigen::Vector2d c(v2[0], v2[1]);
+
+        Eigen::Vector2d m(x, y);
+
+        auto Dab = b - a;
+        auto Dam = m - a;
+        auto Dbc = c - b;
+        auto Dbm = m - b;
+        auto Dca = a - c;
+        auto Dcm = m - c;
+
+        double c0 = Dab[0] * Dam[1] - Dab[1] * Dam[0];
+        double c1 = Dbc[0] * Dbm[1] - Dbc[1] * Dbm[0];
+        double c2 = Dca[0] * Dcm[1] - Dca[1] * Dcm[0];
+
+        if (c0 >= 0 && c1 >= 0 && c2 >= 0) {
+            return true;
+        }
+        if (c0 < 0 && c1 < 0 && c2 < 0) {
+            return true;
+        }
+
+        return false;
     }
 };
 
@@ -232,56 +330,16 @@ struct ModelData {
         this->project = project;
     }
 
-    bool inFace(double x, double y, ElementFace& face) {
-        // auto& face = this->face_list[face_index];
-        auto& v0 = face.vertex_pos_list[0];
-        auto& v1 = face.vertex_pos_list[1];
-        auto& v2 = face.vertex_pos_list[2];
-
-        Eigen::Vector2d a(v0[0], v0[1]);
-        Eigen::Vector2d b(v1[0], v1[1]);
-        Eigen::Vector2d c(v2[0], v2[1]);
-
-        Eigen::Vector2d m(x, y);
-
-        auto Dab = b - a;
-        auto Dam = m - a;
-        auto Dbc = c - b;
-        auto Dbm = m - b;
-        auto Dca = a - c;
-        auto Dcm = m - c;
-
-        double c0 = Dab[0] * Dam[1] - Dab[1] * Dam[0];
-        double c1 = Dbc[0] * Dbm[1] - Dbc[1] * Dbm[0];
-        double c2 = Dca[0] * Dcm[1] - Dca[1] * Dcm[0];
-
-        if (c0 >= 0 && c1 >= 0 && c2 >= 0) {
-            return true;
-        }
-        if (c0 < 0 && c1 < 0 && c2 < 0) {
-            return true;
-        }
-
-        return false;
-    }
-
     void doRaster(int w, int h) {
         PixelMap pmap(w, h, -5, -10);
 
         double dx = 2.0 / w;
         double dy = 2.0 / h;
 
-        for (auto& point : this->point_list) {
-            int i = point.vertex[0] / dx + w / 2;
-            int j = -point.vertex[1] / dy + h / 2;
-
-            printf ("i : %d j : %d\n", i, j);
-        }
-
         for (auto& face : this->face_list) {
             for (int i = 0; i < w; i++) {
                 for (int j = 0; j < h; j++) {
-                    if (inFace(i * dx - 1, (h-j) * dy -1, face)) {
+                    if (face.inFace(i * dx - 1, (h-j) * dy -1)) {
                         pmap.setPixel(i, j, 0, -9);
                     }
 
@@ -291,33 +349,18 @@ struct ModelData {
         pmap.drawDepthPicture();
     }
 
-    void doTrans(bool align) {
+    void doTrans() {
+        auto mv_matrix = this->view * this->model;
+        auto mvp_matrix = this->project * mv_matrix;
+
         for (auto& point : this->point_list) {
-            point.vertex = this->project * this->view * this->model * point.vertex;
-            if (align)
-                point.vertex /= point.vertex[3];
+            point.doTrans(mv_matrix, mvp_matrix);
         }
         for (auto& line : this->line_list) {
-            for (auto& vec3 : line.vertex_pos_list) {
-                vec3 = this->project * this->view * this->model * vec3;
-                if (align)
-                    vec3 /= vec3[3];
-            }
+            line.doTrans(mv_matrix, mvp_matrix);
         }
         for (auto& face : this->face_list) {
-            for (auto& vec3 : face.vertex_pos_list) {
-                vec3 = this->project * this->view * this->model * vec3;
-                if (align)
-                    vec3 /= vec3[3];
-            }
-#if 0
-            for (auto& vec3 : face.vertex_texture_list) {
-                vec3 = this->project * this->view * this->model * vec3;
-            }
-            for (auto& vec3 : face.vertex_normal_list) {
-                vec3 = this->project * this->view * this->model * vec3;
-            }
-#endif
+            face.doTrans(mv_matrix, mvp_matrix);
         }
     }
 
@@ -326,32 +369,20 @@ struct ModelData {
 
         std::cout << "---------------Point :---------------" << std::endl;
         for (auto& point : this->point_list) {
-            std::cout << "T" << point.vertex.transpose().format(CommaInitFmt) << std::endl;
+            point.dump(0);
         }
 
         std::cout << "---------------Line :---------------" << std::endl;
         for (auto& line : this->line_list) {
             printf ("line=>\n");
-            for (auto& vec3 : line.vertex_pos_list) {
-                std::cout << "T" << vec3.transpose().format(CommaInitFmt) << std::endl;
-            }
+            line.dump(0);
         }
 
         std::cout << "---------------Face :---------------" << std::endl;
         for (auto& face : this->face_list) {
             printf ("face============>\n");
             printf ("pos:\n");
-            for (auto& vec3 : face.vertex_pos_list) {
-                std::cout << "T" << vec3.transpose().format(CommaInitFmt) << std::endl;
-            }
-            printf ("texture:\n");
-            for (auto& vec3 : face.vertex_texture_list) {
-                std::cout << "T" << vec3.transpose().format(CommaInitFmt) << std::endl;
-            }
-            printf ("normal:\n");
-            for (auto& vec3 : face.vertex_normal_list) {
-                std::cout << "T" << vec3.transpose().format(CommaInitFmt) << std::endl;
-            }
+            face.dump(0);
         }
     }
 };

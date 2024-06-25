@@ -135,7 +135,7 @@ int main(int argc, const char *argv[]) {
                                     0,0,-1,
                                     0,1,0));
   model_data->setProject(constructMproject(-5,-10,-5,5,-5,5));
-  model_data->doTrans(true);
+  model_data->doTrans();
   model_data->doRaster(640, 360);
   model_data->dump();
 
