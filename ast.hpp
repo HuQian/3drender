@@ -26,6 +26,19 @@ struct VertexDataVN {
     double dz;
 };
 
+static bool
+trans_obj_index_to_arr(int idx, size_t* i, int v_list_size) {
+  if (idx >= 1 && idx <= v_list_size) {
+    *i = idx - 1;
+    return true;
+  } else if (-idx >= 1 && -idx <= v_list_size) {
+    *i = idx + v_list_size;
+    return true;
+  }
+
+  return false;
+}
+
 /*
     p       Point:                          p v1
     l       Line:                           l v1 v2 ... vn
@@ -38,12 +51,44 @@ struct ElementPoint {
     int index_pos;
 
     Eigen::Vector4d vertex;
+
+public:
+    void loadV(std::vector<VertexDataV>& v_list) {
+        size_t i = 0;
+
+        if (!trans_obj_index_to_arr(this->index_pos, &i, v_list.size())) {
+                printf ("failed to load point\n");
+                return;
+        }
+
+        auto& v = v_list[i];
+        this->vertex[0] = v.x;
+        this->vertex[1] = v.y;
+        this->vertex[2] = v.z;
+        this->vertex[3] = 1;
+    }
 };
 
 struct ElementLine {
     std::vector<int> index_pos_list;
 
     std::vector<Eigen::Vector4d> vertex_pos_list;
+
+public:
+    void loadV(std::vector<VertexDataV>& v_list) {
+        for (auto index : this->index_pos_list) {
+            size_t i = 0;
+
+            if (!trans_obj_index_to_arr(index, &i, v_list.size())) {
+                printf ("failed to load line\n");
+                return;
+            }
+
+            auto& v = v_list[i];
+
+            this->vertex_pos_list.push_back(Eigen::Vector4d(v.x, v.y, v.z, 1));
+        }
+    }
 };
 
 struct ElementFace {
@@ -54,6 +99,49 @@ struct ElementFace {
     std::vector<Eigen::Vector4d> vertex_pos_list;
     std::vector<Eigen::Vector3d> vertex_texture_list;
     std::vector<Eigen::Vector4d> vertex_normal_list;
+
+public:
+    void loadV(std::vector<VertexDataV>& v_list) {
+        for (auto index : this->index_pos_list) {
+            size_t i = 0;
+
+            if (!trans_obj_index_to_arr(index, &i,  v_list.size())) {
+                printf ("failed to load face\n");
+                return;
+            }
+
+            auto& v = v_list[i];
+            this->vertex_pos_list.push_back(Eigen::Vector4d(v.x, v.y, v.z, 1));
+        }
+    }
+
+    void loadVT(std::vector<VertexDataVT>& vt_list) {
+        for (auto index : this->index_texture_list) {
+            size_t i = 0;
+
+            if (!trans_obj_index_to_arr(index, &i, vt_list.size())) {
+                printf ("failed to load face\n");
+                return;
+            }
+
+            auto& vt = vt_list[i];
+            this->vertex_texture_list.push_back(Eigen::Vector3d(vt.u, vt.v, 1));
+        }
+    }
+
+    void loadVN(std::vector<VertexDataVN>& vn_list) {
+        for (auto index : this->index_normal_list) {
+            size_t i = 0;
+
+            if (!trans_obj_index_to_arr(index, &i, vn_list.size())) {
+                printf ("failed to load face\n");
+                return;
+            }
+
+            auto& normal = vn_list[i];
+            this->vertex_normal_list.push_back(Eigen::Vector4d(normal.dx, normal.dy, normal.dz, 0));
+        }
+    }
 };
 
 class PixelMap {
@@ -132,8 +220,6 @@ struct ModelData {
     Eigen::Matrix4d view;
     Eigen::Matrix4d project;
 
-    
-
     void setModel(Eigen::Matrix4d model) {
         this->model = model;
     }
@@ -145,27 +231,6 @@ struct ModelData {
     void setProject(Eigen::Matrix4d project) {
         this->project = project;
     }
-
-#if 0
-    void
-    draw_png() {
-    #define RGBA(r, g, b, a) ((r) | ((g) << 8) | ((b) << 16) | ((a) << 24))
-    #define RGB(r, g, b) RGBA(r, g, b, 0xff)
-
-        int W = 640;
-        int H = 360;
-        libattopng_t *png = libattopng_new(W, H, PNG_RGBA);
-        int y, x;
-
-        for (y = 0; y < H; y++) {
-            for (x = 0; x < W; x++) {
-                libattopng_set_pixel(png, x, y, RGBA((int)(x/640.0*255), 0, 255, 100));
-            }
-        }
-        libattopng_save(png, "test_rgba.png");
-        libattopng_destroy(png);
-    }
-#endif
 
     bool inFace(double x, double y, ElementFace& face) {
         // auto& face = this->face_list[face_index];
@@ -210,7 +275,6 @@ struct ModelData {
             int i = point.vertex[0] / dx + w / 2;
             int j = -point.vertex[1] / dy + h / 2;
 
-            //libattopng_set_pixel(png, i, j, RGBA(255, 0, 255, 255));
             printf ("i : %d j : %d\n", i, j);
         }
 
@@ -218,7 +282,6 @@ struct ModelData {
             for (int i = 0; i < w; i++) {
                 for (int j = 0; j < h; j++) {
                     if (inFace(i * dx - 1, (h-j) * dy -1, face)) {
-                        //libattopng_set_pixel(png, i, j, RGBA(0, 0, 255, 255));
                         pmap.setPixel(i, j, 0, -9);
                     }
 
@@ -226,22 +289,6 @@ struct ModelData {
             }
         }
         pmap.drawDepthPicture();
-
-        //libattopng_save(png, "test_rgba.png");
-        //libattopng_destroy(png);
-#if 0
-        for (int i = 0; i < w; i++) {
-            double x0 = dx * i;
-            double x1 = x0 + dx;
-
-            for (int j = 0; j < h; j++) {
-                double y0 = dy * j;
-                double y1 = y0 + dy;
-
-
-            }
-        }
-#endif
     }
 
     void doTrans(bool align) {

@@ -16,20 +16,6 @@ using namespace std;
 extern FILE *yyin;
 
 
-
-bool
-trans_obj_index_to_arr(int idx, size_t* i, int v_list_size) {
-  if (idx >= 1 && idx <= v_list_size) {
-    *i = idx - 1;
-    return true;
-  } else if (-idx >= 1 && -idx <= v_list_size) {
-    *i = idx + v_list_size;
-    return true;
-  }
-
-  return false;
-}
-
 ModelData*
 loadModel(const char* mode_file) {
   yyin = fopen(mode_file, "r");
@@ -42,70 +28,20 @@ loadModel(const char* mode_file) {
   assert(!ret);
 
   for (auto& point : model_data->point_list) {
-    size_t i = 0;
-
-    if (!trans_obj_index_to_arr(point.index_pos, &i, model_data->v_list.size()))
-      goto out;
-
-    auto& vertex = model_data->v_list[i];
-
-    point.vertex[0] = vertex.x;
-    point.vertex[1] = vertex.y;
-    point.vertex[2] = vertex.z;
-    point.vertex[3] = 1;
+    point.loadV (model_data->v_list);
   }
 
   for (auto& line : model_data->line_list) {
-    for (auto index : line.index_pos_list) {
-      size_t i = 0;
-
-      if (!trans_obj_index_to_arr(index, &i, model_data->v_list.size()))
-        goto out;
-
-      auto& vertex = model_data->v_list[i];
-
-      line.vertex_pos_list.push_back(Eigen::Vector4d(vertex.x, vertex.y, vertex.z, 1));
-    }
+    line.loadV (model_data->v_list);
   }
 
   for (auto& face : model_data->face_list) {
-    for (auto index : face.index_pos_list) {
-      size_t i = 0;
-
-      if (!trans_obj_index_to_arr(index, &i, model_data->v_list.size()))
-        goto out;
-
-      auto& vertex = model_data->v_list[i];
-      face.vertex_pos_list.push_back(Eigen::Vector4d(vertex.x, vertex.y, vertex.z, 1));
-    }
-
-    for (auto index : face.index_texture_list) {
-      size_t i = 0;
-
-      if (!trans_obj_index_to_arr(index, &i, model_data->vt_list.size()))
-        goto out;
-
-      auto& texture = model_data->vt_list[i];
-      face.vertex_texture_list.push_back(Eigen::Vector3d(texture.u, texture.v, 0));
-    }
-
-    for (auto index : face.index_normal_list) {
-      size_t i = 0;
-
-      if (!trans_obj_index_to_arr(index, &i, model_data->vn_list.size()))
-        goto out;
-
-      auto& normal = model_data->vn_list[i];
-      face.vertex_normal_list.push_back(Eigen::Vector4d(normal.dx, normal.dy, normal.dz, 0));
-    }
+    face.loadV(model_data->v_list);
+    face.loadVT(model_data->vt_list);
+    face.loadVN(model_data->vn_list);
   }
 
   return model_data;
-
-out:
-  printf ("Error: fail determine\n");
-  delete model_data;
-  return NULL;
 }
 
 
