@@ -142,7 +142,52 @@ private:
     std::vector<Eigen::Vector3d> vertex_texture_list;
     std::vector<Eigen::Vector4d> vertex_normal_list;
 
+    double ra;
+    double rb;
+    double rc;
+
 public:
+    double calDepth (double x, double y) {
+        Eigen::Vector3d p(x, y, 0);
+
+        auto& p0 = this->vertex_pos_list_mvp[0];
+        auto& p1 = this->vertex_pos_list_mvp[1];
+        auto& p2 = this->vertex_pos_list_mvp[2];
+
+        double v0 = this->vertex_pos_list_mv[0][2];
+        double v1 = this->vertex_pos_list_mv[1][2];
+        double v2 = this->vertex_pos_list_mv[2][2];
+
+        Eigen::Vector3d a(p0[0], p0[1], 0);
+        Eigen::Vector3d b(p1[0], p1[1], 0);
+        Eigen::Vector3d c(p2[0], p2[1], 0);
+
+        auto ab = b - a;
+
+        auto cb = b - c;
+        auto cp = p - c;
+
+        auto ac = c - a;
+        auto ap = p - a;
+
+        auto ba = a - b;
+        auto bp = p - a;
+
+        double size_whole = ab.cross(ac).norm();
+        double size_a = cb.cross(cp).norm();
+        double size_b = ac.cross(ap).norm();
+        double size_c = ba.cross(bp).norm();
+
+        this->ra = size_a / size_whole;
+        this->rb = size_b / size_whole;
+        this->rc = size_c / size_whole;
+
+        double depth = this->ra * v0 + this->rb * v1 + this->rc * v2;
+        printf ("depth %lf %lf : %lf\n", x, y, depth);
+
+        return depth;
+    }
+
     void loadV(std::vector<VertexDataV>& v_list) {
         for (auto index : this->index_pos_list) {
             size_t i = 0;
@@ -204,6 +249,8 @@ public:
         }
     }
 
+
+
     bool inFace(double x, double y) {
         if (this->vertex_pos_list.size() != 3) {
             std::cout << "Fail to judge inface\n";
@@ -256,14 +303,14 @@ class PixelMap {
     Pixel* pixels;
     int pixelCount;
 
-    double depthMin;
-    double depthMax;
+    double depthNear;
+    double depthFar;
 public:
-    PixelMap(int width, int height, double depth_min, double depth_max) {
+    PixelMap(int width, int height, double depth_near, double depth_far) {
         this->w = width;
         this->h = height;
-        this->depthMax = depth_max;
-        this->depthMin = depth_min;
+        this->depthFar = depth_far;
+        this->depthNear = depth_near;
         this->pixelCount = this->w * this->h;
         this->pixels = new Pixel[this->pixelCount];
         for (int i = 0; i < this->pixelCount; i++) {
@@ -274,7 +321,7 @@ public:
     void setPixel(int i, int j, uint32_t color, double depth) {
         Pixel* p = &(this->pixels[i + j * this->w]);
         if (p->occupied) {
-            if (depth < p->depth) {
+            if (depth > p->depth) {
                 p->depth = depth;
                 p->color = color;
             }
@@ -291,7 +338,7 @@ public:
             for (int j = 0; j < this->h; j++) {
                 Pixel* p = &(this->pixels[i + j * this->w]);
                 if (p->occupied) {
-                    int depth_color = (p->depth - this->depthMin) / (this->depthMax - this->depthMin) * 255;
+                    int depth_color = (this->depthNear - p->depth) / (this->depthNear - this->depthFar) * 255;
                     libattopng_set_pixel(png, i, j, RGBA(depth_color, depth_color, depth_color, 255));
                 }
             }
@@ -339,8 +386,12 @@ struct ModelData {
         for (auto& face : this->face_list) {
             for (int i = 0; i < w; i++) {
                 for (int j = 0; j < h; j++) {
-                    if (face.inFace(i * dx - 1, (h-j) * dy -1)) {
-                        pmap.setPixel(i, j, 0, -9);
+                    double x = i * dx - 1;
+                    double y = (h-j) * dy -1;
+                    if (face.inFace(x, y)) {
+                        //pmap.setPixel(i, j, 0, -50 * face.calDepth(x, y));
+                        pmap.setPixel(i, j, 0, face.calDepth(x, y));
+
                     }
 
                 }
